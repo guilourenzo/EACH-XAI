@@ -1,0 +1,403 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  margin-bottom: 50px;
+  padding: 0;
+  background-color: #feffedff
+}
+
+select {
+  padding: 3px;
+  /* Espaçamento interno */
+  font-size: 16px;
+  border: 3px solid #333;
+  border-radius: 5px;
+  /* Cantos arredondados */
+  background-color: #555;
+  /* Cor de fundo */
+  color: #feffedff;
+  /* Cor do texto */
+  width: 200px;
+  /* Largura da caixa select */
+  outline: none;
+  /* Remove a borda de destaque ao clicar */
+}
+
+input[type="number"] {
+  padding: 3px;
+  font-size: 16px;
+  border: 3px solid #616161;
+  border-radius: 5px;
+  background-color: #f5f5f5;
+  color: #333;
+  width: 100px;
+  outline: none;
+}
+
+input[type="number"]:focus {
+  border: 3px solid #363636;
+}
+
+/* -------- Menu Lateral -------- */
+#menu {
+  width: 250px;
+  height: 100%;
+  background-color: #333;
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow-x: hidden;
+  padding-top: 20px;
+}
+
+#menu a {
+  padding: 15px 25px;
+  text-decoration: none;
+  font-size: 20px;
+  color: #feffedff;
+  display: block;
+}
+
+#menu a:hover {
+  background-color: #555;
+}
+
+/* ------------------------- */
+
+#conteudo {
+  margin-left: 250px;
+  padding: 15px;
+  background-color: #feffedff;
+  width: calc(100% - 250px);
+}
+
+#conteudo .button {
+  display: inline-block;
+  padding: 5px 5px;
+  margin: 5px;
+  background-color: #333;
+  color: #feffedff;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 5px;
+  border: none;
+}
+
+#content_manual_select {
+  padding: 15px;
+  background-color: #feffedff;
+  overflow: hidden;
+  margin-left: 250px;
+}
+
+#datasetFileName,
+#modelFileName {
+  font-size: 18px;
+  color: #555;
+  font-weight: bold;
+}
+
+#downloadButton,
+#fakeFileInput,
+#fakeFileInputModel,
+#fakeFileInputDataset,
+#fakeFileInputSample,
+#gerarConfig {
+  display: inline-block;
+  padding: 5px 5px;
+  margin: 5px;
+  background-color: #333;
+  color: #feffedff;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 5px;
+  border: none;
+}
+
+#fakeFileSpan {
+  font-size: 13px;
+}
+
+#fileInput,
+#fileInputModel,
+#fileInputDataset,
+#fileInputSample,
+#uploadButton,
+#uploadButtonDataset,
+#uploadButtonModel,
+#uploadButtonSample {
+  display: none;
+}
+
+#explain_sf {
+  font-size: 12px;
+  color: #5f5f5f;
+}
+
+#explain_mode {
+  font-size: 12px;
+  background-color: #feffedff;
+  margin-top: 5px;
+  color: #5f5f5f;
+}
+
+#explain_fs {
+  font-size: 15px;
+  background-color: #feffedff;
+  color: #5f5f5f;
+}
+
+h1 {
+  font-size: 30px;
+  color: #333;
+}
+
+#featuresListContainer {
+  margin-top: 5px;
+  max-height: 200px;
+  overflow-y: auto;
+  text-align: left;
+  font-size: 15px;
+  color: #333;
+  border-top: 1px solid #5f5f5f;
+  border-bottom: 1px solid #5f5f5f;
+}
+
+#featuresList {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+#featuresList li {
+  padding: 5px;
+  border: 1px solid #5f5f5f;
+}
+
+h2 {
+  color: #333;
+}
+
+.hidden {
+  display: none;
+}
+
+#loading-indicator_df {
+  color: #333;
+  font-size: 20px;
+  display: none;
+}
+
+#loading-indicator_sf {
+  color: #333;
+  font-size: 20px;
+  display: none;
+}
+
+#sf_table {
+  max-height: 400px;
+  overflow: auto;
+}
+
+#fs_menu,
+#stContent {
+  margin-left: 250px;
+  text-align: center;
+  padding: 15px;
+  background-color: #feffedff;
+}
+
+#fs_menu h1,
+#stContent h1 {
+  margin-top: 30px;
+}
+
+#fs_menu p,
+#stContent p {
+  font-size: 15px;
+  padding: 1px 200px;
+  background-color: #feffedff;
+  color: #5f5f5f;
+}
+
+.fsManual,
+.fsRecursive,
+.fsUnivariate {
+  display: inline-block;
+  padding: 10px 20px;
+  margin: 10px;
+  background-color: #333;
+  color: #feffedff;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 5px;
+  border: none;
+}
+
+.active {
+  display: inline-block;
+  padding: 10px 20px;
+  margin: 10px;
+  background-color: #555;
+  color: #feffedff;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 5px;
+  border: none;
+}
+
+#fs_menu .disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+#tableData_df {
+  max-width: 1000px;
+  max-height: 350px;
+  overflow: auto;
+}
+
+#random {
+  padding: 3px;
+  font-size: 16px;
+  border: 3px solid #616161;
+  border-radius: 5px;
+  background-color: #f5f5f5;
+  color: #333;
+  width: 130px;
+  outline: none;
+}
+
+.setorPreprocess {
+  width: calc(90%);
+  background-color: #868686;
+  border: 3px solid #868686;
+  border-radius: 10px;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  transition: height 0.3s ease;
+  color: #feffedff;
+  margin: 7px;
+}
+
+.conteudoSetorPreprocess {
+  padding: 10px;
+  border-top: 1px solid #ccc;
+  background-color: #dfdfdf;
+  color: #333;
+  font-size: 12px;
+  text-align: center;
+  cursor: default;
+  display: none;
+}
+
+.conteudoSetorPreprocess p {
+  text-align: center !important;
+  display: block !important;
+}
+
+#conteudoFsManual {
+  text-align: left;
+  align-self: left;
+}
+
+#addConfiguracao,
+#removeConfiguracao {
+  display: inline-block;
+  padding: 5px 5px;
+  background-color: #333;
+  color: #feffedff;
+  text-decoration: none;
+  cursor: pointer;
+  width: 30px;
+  border-radius: 5px;
+  border: none;
+  text-align: center;
+}
+
+.search-filter {
+  width: 300px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  margin-bottom: 10px;
+  background-color: #dfdfdf;
+  border-radius: 5px;
+}
+
+.search-filter .checkbox-list {
+  max-height: 150px;
+  overflow-y: auto;
+  /* Ativa a barra de rolagem vertical */
+  margin-top: 10px;
+  padding-right: 10px;
+  /* Para não sobrepor a barra de rolagem */
+}
+
+.search-filter label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.search-filter input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  border: 3px solid #616161;
+  box-sizing: border-box;
+  border-radius: 5px;
+}
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  text-align: center;
+  background-color: #333;
+  color: white;
+  line-height: 16px;
+  margin-left: 5px;
+}
+
+.tooltip .tooltip-text {
+  visibility: hidden;
+  width: max-content;
+  max-width: 250px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: 5px;
+  position: absolute;
+  bottom: 140%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  font-size: 12px;
+  white-space: normal;
+  /* Permite quebra de linha */
+  z-index: 10;
+}
+
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Adiciona uma setinha no balão */
+.tooltip .tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent;
+}
