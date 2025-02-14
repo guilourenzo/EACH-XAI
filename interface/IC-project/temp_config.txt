@@ -1,0 +1,14 @@
+NumFolds: 5
+Scalers: MinMaxScaler, StandardScaler, RobustScaler
+minK: 1, maxK: 8
+Score Function: f_classif, chi2, mutual_info_classif
+Activation Function: relu, logistic, tanh, identity
+Solver: adam, lbfgs, sgd
+Learning Rate: constant, adaptive, invscaling
+minLearningRateInit: 0.0001, maxLearningRateInit: 0.1
+minAlfa: 0.00001, maxAlfa: 0.1
+Hidden Layer Sizes: (50, 100), (100, 150, 150), (50, 100, 100, 100, 150), (50, 100, 150)
+minEpochs: 1000, maxEpochs: 10000
+NumTrials: 15
+Var Target: target
+Var Deleted: tricepsthickness

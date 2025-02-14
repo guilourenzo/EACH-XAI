@@ -1,0 +1,6 @@
+Mapeamentos do LabelEncoder para variáveis qualitativas:
+
+Coluna: target
+  tested_negative: 0
+  tested_positive: 1
+
