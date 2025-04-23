@@ -274,7 +274,7 @@ def objective(trial):
         if 'Input X must be non-negative' in str(e):
             return float('-inf')  # Indica falha no trial
         else:
-            raise e  # Levanta outros erros para depuração
+            raise e 
 
 
 # Estudo com Optuna

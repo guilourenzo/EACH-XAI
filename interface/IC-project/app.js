@@ -13,7 +13,9 @@ var os = require('os');
 var usersRouter = require('./routes/users');
 var indexRouter = require('./routes/index');
 var modelDevRouter = require('./routes/modelDev');
+var modelDevOldRouter = require('./routes/modelDevOld');
 var modelAppRouter = require('./routes/modelApp');
+var modelAppOldRouter = require('./routes/modelAppOld');
 
 var app = express();
 
@@ -111,7 +113,9 @@ app.post('/uploadModel', upload.single('uploadModel'), (req, res) => {
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.use('/modelDev', modelDevRouter);
+app.use('/modelDevOld', modelDevOldRouter);
 app.use('/modelApp', modelAppRouter);
+app.use('/modelAppOld', modelAppOldRouter);
 
 //----------------------------------- Get File Name --------------------------------\\
 app.get('/datasetFileName', (req, res) => {

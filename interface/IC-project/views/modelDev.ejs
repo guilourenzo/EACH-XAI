@@ -1,866 +1,1446 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Model Development</title>
     <link rel="stylesheet" type="text/css" href="stylesheets/style.css">
 </head>
 
 <body>
     <div id="menu">
-        <%- include('templates/side_menu.ejs') %>
+        <%- include('templates/top_menu.ejs') %>
     </div>
 
-    <div id="conteudo">
-        <h1 style="width: calc(90%); text-align: center;">Manipulação de Dados e Construção do Modelo</h1>
-        <!-- <div class="setorPreprocess">
-            <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">Hiperparâmetros
-            </div>
-            <div class="conteudoSetorPreprocess">
-            </div>
-        </div> -->
-        <form id="uploadForm" enctype="multipart/form-data">
-            <div>
-                <div id="fakeFileInput" style="align-content: center;">
-                    <span id="fakeFileSpan"><b>Selecionar Dataset</b></span>
-                    <input type="file" id="fileInput" name="uploadDataset" accept=".csv" style="display: none;">
-                </div>
-                <p></p>
-                <p id="datasetFileName" style="margin-left: 10px;">Dataset:</p>
-                <button type="submit" id="uploadButton">Upload Dataset</button>
-                <p id="uploadStatus"></p>
-            </div>
-        </form>
-        <div id="featureNumber" style="margin-left: 10px;">Número de variáveis:</div>
-        <script>
-            // Requisição inicial para buscar o nome do arquivo e número de variáveis ao carregar a página
-            window.addEventListener('DOMContentLoaded', () => {
-                fetch('/datasetFileName')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Nenhum dataset selecionado');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        document.getElementById('datasetFileName').innerText = 'Dataset: ' + data.fileName;
-                        document.getElementById('featureNumber').innerText = 'Número de variáveis: ' + data.numVariaveis;
-                        document.getElementById('k2').max = data.numVariaveis;
-                        document.getElementById('k2').value = data.numVariaveis;
-                    })
-                    .catch(error => {
-                        console.error('Erro ao carregar dataset:', error);
-                        document.getElementById('datasetFileName').innerText = 'Nenhum dataset selecionado';
-                        document.getElementById('featureNumber').innerText = '';
-                    });
-            });
-        </script>
-        <script>
-            // Fake FileInput
-            const fakeFileInput = document.getElementById('fakeFileInput');
-            const fileInput = document.getElementById('fileInput');
-
-            fakeFileInput.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            fileInput.addEventListener('change', () => {
-                document.getElementById('uploadButton').click();
-            });
-
-            // Add event listener to form submission
-            document.getElementById('uploadForm').addEventListener('submit', function (event) {
-                event.preventDefault(); // Evita o envio padrão do formulário
-
-                var formData = new FormData(); // Cria um objeto FormData para armazenar os dados do formulário
-                var fileInput = document.getElementById('fileInput');
-                formData.append('uploadDataset', fileInput.files[0]); // Adiciona o arquivo ao FormData
-
-                // Exibe a mensagem de upload em progresso
-                document.getElementById('uploadStatus').textContent = 'Upload in progress...';
-
-                // Envia os dados do formulário usando fetch
-                fetch('/uploadDataset', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        // Limpa a mensagem de upload
-                        document.getElementById('uploadStatus').textContent = '';
-
-                        // Busca o nome do dataset atualizado
-                        return fetch('/datasetFileName');
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log(data); // Para depuração
-                        document.getElementById('datasetFileName').innerText = 'Dataset: ' + data.fileName;
-                        document.getElementById('featureNumber').innerText = 'Número de variáveis: ' + data.numVariaveis;
-                        document.getElementById('k2').max = data.numVariaveis;
-                        document.getElementById('k2').value = data.numVariaveis;
-
-                        // Atualiza os filtros de variáveis com o novo dataset
-                        fetchVariables();
-                    })
-                    .catch(error => {
-                        console.error('There was a problem with the file upload:', error);
-                        // Display upload failed message
-                        document.getElementById('uploadStatus').textContent = 'Upload failed. Please try again';
-                    });
-            });
-        </script>
-
-        <p style="margin-right: 10px; color: #333; font-weight: bold;">
-            Selecione a <u>variável alvo</u>:
-        </p>
-        <div class="search-filter">
-            <input type="text" id="search-target" placeholder="Digite para buscar..." onkeyup="filterOptions('target')">
-            <div id="checkbox-list-target" class="checkbox-list"></div>
-        </div>
-
-        <p style="margin-top: 20px; margin-right: 10px; color: #333; font-weight: bold;">
-            Selecione, caso queira, as <u>variáveis que deseja excluir</u>:
-        </p>
-        <div class="search-filter">
-            <input type="text" id="search-deleted" placeholder="Digite para buscar..."
-                onkeyup="filterOptions('deleted')">
-            <div id="checkbox-list-deleted" class="checkbox-list"></div>
-        </div>
-
-        <script>
-            let options = [];
-            const selectedTarget = {};
-            const selectedDeleted = {};
-
-            // Função para buscar as variáveis do backend
-            function fetchVariables() {
-                fetch('/datasetFileName')
-                    .then(response => response.json())
-                    .then(data => {
-                        options = data.variaveis;
-                        filterOptions('target');
-                        filterOptions('deleted');
-                    })
-                    .catch(error => {
-                        console.error('Erro ao buscar as variáveis:', error);
-                    });
-            }
-
-            // Função para filtrar e exibir as opções
-            function filterOptions(type) {
-                const searchValue = document.getElementById(`search-${type}`).value.toLowerCase();
-                const checkboxList = document.getElementById(`checkbox-list-${type}`);
-                checkboxList.innerHTML = ''; // Limpa as opções anteriores
-
-                const otherSelections = type === 'target' ? selectedDeleted : selectedTarget;
-                const filteredOptions = options.filter(
-                    option => option.toLowerCase().includes(searchValue) && !otherSelections[option]
-                );
-
-                filteredOptions.forEach(option => {
-                    const label = document.createElement('label');
-                    const isChecked = (type === 'target' ? selectedTarget : selectedDeleted)[option] || false;
-                    label.innerHTML = `<input type="checkbox" name="option" value="${option}" ${isChecked ? 'checked' : ''} 
-                onchange="updateSelection(this, '${type}')"> ${option}`;
-                    checkboxList.appendChild(label);
-                });
-            }
-
-            // Função para atualizar o estado de seleção
-            function updateSelection(checkbox, type) {
-                const selectedGroup = type === 'target' ? selectedTarget : selectedDeleted;
-                const otherGroup = type === 'target' ? selectedDeleted : selectedTarget;
-
-                if (type === 'target') {
-                    // Garante que apenas um checkbox pode ser selecionado para a variável alvo
-                    if (checkbox.checked) {
-                        // Desmarca qualquer outra opção selecionada
-                        Object.keys(selectedTarget).forEach(key => {
-                            delete selectedTarget[key];
-                        });
-
-                        // Marca a nova opção
-                        selectedTarget[checkbox.value] = true;
-                    } else {
-                        delete selectedTarget[checkbox.value];
-                    }
-                } else {
-                    // Mantém a lógica normal para variáveis excluídas (permite múltiplas seleções)
-                    selectedGroup[checkbox.value] = checkbox.checked;
-                }
-
-                // Remove a variável do outro filtro se foi selecionada
-                if (checkbox.checked) {
-                    delete otherGroup[checkbox.value];
-                }
-
-                // Atualiza as listas para refletir as mudanças
-                filterOptions('target');
-                filterOptions('deleted');
-            }
-
-            // Inicializa as variáveis ao carregar a página
-            fetchVariables();
-        </script>
-
-        <div id="foldsDiv">
-            <div style="margin-left: 10px; display: flex; align-items: center; margin-bottom: 0;">
-                <p style="margin-right: 10px; color: #333; font-weight: bold;">Número de dobras (folds):</p>
-                <input type="number" id="foldInput" style="width: 50px; height: 15px;" min="2">
-            </div>
-            <p id="explain_sf" style="margin-left: 10px; margin-top: 0; margin-bottom: 30px;">Normalmente usa-se 5
-                ou 10
-                dobras.</p>
-        </div>
-        <div class="setorPreprocess">
-            <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">Pré-processamento
-                de
-                Dados
-            </div>
-            <div class="conteudoSetorPreprocess">
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                        Escalonador
-                    </div>
-                    <div class="conteudoSetorPreprocess">
-                        <p style="display: flex; align-items: center; text-align: center;">
-                            Ferramentas utilizadas para normalizar ou escalar os dados.
-                        </p>
-                        <div style="text-align: center; margin-left: 10px;">
-                            <input type="checkbox" id="minmax" checked>
-                            <label for="minmax" style="color:#333; margin-right: 20px;">MinMaxScaler</label>
-                            <input type="checkbox" id="standard">
-                            <label for="standard" style="color:#333; margin-right: 20px;">StandardScaler</label>
-                            <input type="checkbox" id="robust">
-                            <label for="robust" style="color:#333; margin-right: 20px;">RobustScaler</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">Seleção
-                        de
-                        Características
-                    </div>
-                    <div class="conteudoSetorPreprocess" style="justify-content: center;">
-                        <p style="display: flex; align-items: center;">Filtre um subconjunto das
-                            características
-                            mais
-                            importantes e relevantes de um conjunto de dados.
-                            Esta etapa é importante pois simplifica e melhora modelos de aprendizado de máquina,
-                            permitindo uma
-                            interpretação mais clara dos padrões nos dados e melhorando a capacidade de
-                            generalização do
-                            modelo
-                            para novos exemplos.</p>
-                        <p style="display: flex; align-items: center;"> O método utilizado é o Select K Best. O
-                            parâmetro k determina a quantidade de características que serão mantidas e as funções de
-                            pontuação são responsáveis pela classificação das características de acordo com a
-                            pontuação.
-                        </p>
-                        <div style="text-align: left; margin-left: 10px;">
-                            <h2>Selecione o intervalo do parâmetro K:</h2>
-                            <form>
-                                <label for="k1">Menor valor do intervalo:</label>
-                                <input type="number" id="k1" name="k1" min="1" value="1" style="margin-right: 20px"
-                                    required>
-                                <label for="k2">Maior valor do intervalo:</label>
-                                <input type="number" id="k2" name="k2" min="1" style="margin-right: 20px" required>
-                                <p id="error-message-k" style="color: red;"></p>
-                            </form>
-
-                            <script>
-                                const k1Input = document.getElementById('k1');
-                                const k2Input = document.getElementById('k2');
-                                const errorMessageK = document.getElementById('error-message-k');
-
-                                function validateInputs() {
-                                    const k1Value = parseInt(k1Input.value) || 0;
-                                    const k2Value = parseInt(k2Input.value) || 0;
-
-                                    // Atualiza os limites conforme as restrições
-                                    k1Input.max = k2Value;
-                                    k2Input.min = k1Value;
-
-                                    // Verifica se os valores inseridos são válidos
-                                    if (k1Value < 0 || k1Value > k2Value) {
-                                        errorMessageK.innerText = "O valor inicial deve ser maior ou igual a 0 e menor ou igual ao valor final.";
-                                    } else if (k2Value < k1Value) {
-                                        errorMessageK.innerText = "O valor final deve ser maior ou igual ao valor inicial e menor ou igual ao numero de características.";
-                                    } else {
-                                        errorMessageK.innerText = ""; // Limpa mensagem de erro se tudo está válido
-                                    }
-                                }
-
-                                // Adiciona eventos para validar os inputs em cada alteração
-                                k1Input.addEventListener('input', validateInputs);
-                                k2Input.addEventListener('input', validateInputs);
-                            </script>
-                        </div>
-                        <div style="text-align: left; margin-left: 10px; margin-top: 40px;">
-                            <h2>Selecionar as funções de pontuação:</h2>
-                            <input type="checkbox" id="f_classif" name="sn" checked>
-                            <label for="f_classif" style="color:#333; margin-right: 20px;">f_classif</label>
-                            <input type="checkbox" id="chi2" name="sn">
-                            <label for="chi2" style="color:#333; margin-right: 20px;">chi2</label>
-                            <input type="checkbox" id="mutual_info_classif" name="sn">
-                            <label for="mutual_info_classif" style="color:#333">mutual_info_classif</label>
-                        </div>
-                    </div>
+    <div class="container_geral">
+        <form id="wizardForm"
+            style="height: 100%; max-height: 100%; width: 100%; max-width: 100%; display: flex; flex-direction: column;"
+            enctype="multipart/form-data">
+            <div class="step" id="step1">
+                <div class="step-title">Section General Explanation</div>
+                <div class="step-content">
+                    <h4>This section is dedicated to develop a Multi-Layer Perceptron (MLP) model for data
+                        classification.</h4>
+                    <p style="max-width: 90%;">Start by uploading your dataset, selecting the target variable, and
+                        optionally excluding specific features. Then, configure the preprocessing steps, including
+                        scaling and feature selection, and define the hyperparameter search space for the MLP model.</p>
+                    <p style="max-width: 90%;">The training process utilizes the Tree-structured Parzen Estimator (TPE)
+                        for hyperparameter optimization, allowing you to specify both numerical ranges and categorical
+                        choices. These selections will guide the TPE in exploring the best configurations for your
+                        model.</p>
                 </div>
             </div>
-        </div>
-        <div class="setorPreprocess">
-            <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                Hiperparâmetros
-            </div>
-            <div class="conteudoSetorPreprocess">
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                        Funções de ativação
-                    </div>
-                    <div class="conteudoSetorPreprocess">
-                        <p style="display: flex; align-items: center; text-align: center;">
-                            Função de ativação para as camadas.
-                        </p>
-                        <div style="text-align: center; margin-left: 10px;">
-                            <input type="checkbox" id="relu" checked>
-                            <label for="relu" style="color:#333; margin-right: 20px;">relu</label>
-                            <input type="checkbox" id="logistic">
-                            <label for="logistic" style="color:#333; margin-right: 20px;">logistic</label>
-                            <input type="checkbox" id="tanh">
-                            <label for="tanh" style="color:#333; margin-right: 20px;">tanh</label>
-                            <input type="checkbox" id="identity">
-                            <label for="identity" style="color:#333">identity</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                        Solver
-                    </div>
-                    <div class="conteudoSetorPreprocess">
-                        <p style="display: flex; align-items: center; text-align: center;">
-                            Algoritmo de otimização utilizado para o ajuste dos pesos.
-                        </p>
-                        <div style="text-align: center; margin-left: 10px;">
-                            <input type="checkbox" id="adam" checked>
-                            <label for="adam" style="color:#333; margin-right: 20px;">adam</label>
-                            <input type="checkbox" id="lbfgs">
-                            <label for="lbfgs" style="color:#333; margin-right: 20px;">lbfgs</label>
-                            <input type="checkbox" id="sgd">
-                            <label for="sgd" style="color:#333; margin-right: 20px;">sgd</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                        Taxa de Aprendizado
-                    </div>
-                    <div class="conteudoSetorPreprocess">
-                        <p style="display: flex; align-items: center; text-align: center;">
-                            Esquema de ajuste da taxa de aprendizado. Apenas usado quando solver='sgd'.
-                        </p>
-                        <div style="text-align: center; margin-left: 10px;">
-                            <input type="checkbox" id="constant" checked>
-                            <label for="constant" style="color:#333; margin-right: 20px;">constant</label>
-                            <input type="checkbox" id="adaptive">
-                            <label for="adaptive" style="color:#333; margin-right: 20px;">adaptive</label>
-                            <input type="checkbox" id="invscaling">
-                            <label for="invscaling" style="color:#333; margin-right: 20px;">invscaling</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                        Taxa de Aprendizado Inicial
-                    </div>
-                    <div class="conteudoSetorPreprocess">
-                        <p style="display: flex; align-items: center; text-align: center;">
-                            A taxa de aprendizado inicial usada. Controla o tamanho do passo ao atualizar os pesos.
-                            Apenas usada quando solver=’sgd’ ou ‘adam’.
-                        </p>
-                        <div style="text-align: center; margin-left: 10px;">
-                            <form id="lrForm">
-                                <label for="lr1">Menor valor do intervalo:</label>
-                                <input type="number" id="lr1" name="lr1" min="0.0001" max="0.1" step="0.0001"
-                                    value="0.0001" style="margin-right: 20px" required>
-                                <label for="lr2">Maior valor do intervalo:</label>
-                                <input type="number" id="lr2" name="lr2" min="0.0001" max="0.1" step="0.0001"
-                                    value="0.1" style="margin-right: 20px" required>
-                                <p id="error-message-lr" style="color: red;"></p>
-                            </form>
-                            <script>
-                                const lr1Input = document.getElementById('lr1');
-                                const lr2Input = document.getElementById('lr2');
-                                const errorMessageLR = document.getElementById('error-message-lr');
 
-                                function validateInputs() {
-                                    const lr1Value = parseFloat(lr1Input.value);
-                                    const lr2Value = parseFloat(lr2Input.value);
-
-                                    // Atualiza os limites conforme as restrições
-                                    lr1Input.max = lr2Value;
-                                    lr2Input.min = lr1Value;
-
-                                    // Verifica se os valores inseridos são válidos
-                                    if (lr1Value > lr2Value) {
-                                        errorMessageLR.innerText = "O valor inicial não pode ser maior que o valor final.";
-                                    } else if (lr2Value < lr1Value) {
-                                        errorMessageLR.innerText = "O valor final não pode ser menor que o valor inicial.";
-                                    } else {
-                                        errorMessageLR.innerText = ""; // Limpa mensagem de erro se tudo está válido
-                                    }
-                                }
-
-                                // Adiciona eventos para validar os inputs em cada alteração
-                                lr1Input.addEventListener('input', validateInputs);
-                                lr2Input.addEventListener('input', validateInputs);
-                            </script>
-                        </div>
-                    </div>
-                </div>
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                        Alfa
-                    </div>
-                    <div class="conteudoSetorPreprocess">
-                        <p style="display: flex; align-items: center; text-align: center;">
-                            Parâmetro de regularização que controla o quanto o modelo penaliza pesos altos para
-                            evitar
-                            overfitting. Defina o intervalo de alfa.
-                        </p>
-                        <div style="text-align: center; margin-left: 10px;">
-                            <form id="alphaForm">
-                                <label for="alpha1">Menor valor do intervalo:</label>
-                                <input type="number" id="alpha1" name="alpha1" min="0.00001" max="0.1" step="0.00001"
-                                    value="0.00001" style="margin-right: 20px" required>
-                                <label for="alpha2">Maior valor do intervalo:</label>
-                                <input type="number" id="alpha2" name="alpha2" min="0.00001" max="0.1" step="0.00001"
-                                    value="0.1" style="margin-right: 20px" required>
-                                <p id="error-message-alpha" style="color: red;"></p>
-                            </form>
-                            <script>
-                                const alpha1Input = document.getElementById('alpha1');
-                                const alpha2Input = document.getElementById('alpha2');
-                                const errorMessageAlpha = document.getElementById('error-message-alpha');
-
-                                function validateInputs() {
-                                    const alpha1Value = parseFloat(alpha1Input.value);
-                                    const alpha2Value = parseFloat(alpha2Input.value);
-
-                                    // Atualiza os limites conforme as restrições
-                                    alpha1Input.max = alpha2Value;
-                                    alpha2Input.min = alpha1Value;
-
-                                    // Verifica se os valores inseridos são válidos
-                                    if (alpha1Value > alpha2Value) {
-                                        errorMessageAlpha.innerText = "O valor inicial não pode ser maior que o valor final.";
-                                    } else if (alpha2Value < alpha1Value) {
-                                        errorMessageAlpha.innerText = "O valor final não pode ser menor que o valor inicial.";
-                                    } else {
-                                        errorMessageAlpha.innerText = ""; // Limpa mensagem de erro se tudo está válido
-                                    }
-                                }
-
-                                // Adiciona eventos para validar os inputs em cada alteração
-                                alpha1Input.addEventListener('input', validateInputs);
-                                alpha2Input.addEventListener('input', validateInputs);
-                            </script>
-                        </div>
-                    </div>
-                </div>
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                        Camada Oculta
-                    </div>
-                    <div class="conteudoSetorPreprocess">
-                        <p style="display: flex; align-items: center; text-align: center;">
-                            Defina as configurações da quantidade de camadas ocultas e o número de neurônios por
-                            camada.
-                        </p>
-                        <div id="configuracoes"></div>
-                        <div style="display: flex; gap: 10px;">
-                            <button id="addConfiguracao" style="margin-left: 10px;">+</button>
-                            <button id="removeConfiguracao">-</button>
+            <div class="step" id="step2">
+                <div class="step-title">Dataset Upload</div>
+                <div class="step-content">
+                    <h3>Upload your dataset in CSV or Excel format.</h3>
+                    <div id="uploadForm" enctype="multipart/form-data">
+                        <div>
+                            <div id="fakeFileInput" style="align-content: center;">
+                                <span id="fakeFileSpan"><b>Upload Dataset</b></span>
+                                <input type="file" id="fileInput" name="uploadDataset" accept=".csv"
+                                    style="display: none;">
+                            </div>
+                            <p id="datasetFileName" style="margin-top: 10px;">Dataset:</p>
+                            <button type="submit" id="uploadButton">Upload Dataset</button>
+                            <p id="uploadStatus"></p>
                         </div>
                     </div>
                     <script>
-                        let configuracaoCount = 0;
+                        // Requisição inicial para buscar o nome do arquivo e número de variáveis ao carregar a página
+                        window.addEventListener('DOMContentLoaded', () => {
+                            fetch('/datasetFileName')
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error('No dataset selected');
+                                    }
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    document.getElementById('datasetFileName').innerText = 'Dataset: ' + data.fileName;
+                                    document.getElementById('k2').max = data.numVariaveis;
+                                    document.getElementById('k2').value = data.numVariaveis;
 
-                        document.getElementById('addConfiguracao').addEventListener('click', () => {
-                            configuracaoCount++;
-                            const configuracoes = document.getElementById('configuracoes');
-                            const novaConfiguracao = document.createElement('div');
-                            novaConfiguracao.className = 'setorPreprocess';
-                            novaConfiguracao.id = `configuracao${configuracaoCount}`;
-                            novaConfiguracao.innerHTML = `
-                                <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                                    Configuração ${configuracaoCount}
-                                </div>
-                                <div class="conteudoSetorPreprocess">
-                                    <div style="text-align: center; margin-left: 10px;">
-                                        <form id="hiddenLayerForm">
-                                            <label for="numLayers">Número de camadas ocultas:</label>
-                                            <input type="number" id="numLayers" name="numLayers" min="1" style="width: 50px;" required>
-                                            <div id="layerInputs" style="display: flex; flex-wrap: wrap; justify-content: center;"></div>
-                                        </form>
-                                    </div>
-                                </div>
-                            `;
-                            configuracoes.appendChild(novaConfiguracao);
-
-                            const numLayersInput = novaConfiguracao.querySelector('#numLayers');
-                            const layerInputsDiv = novaConfiguracao.querySelector('#layerInputs');
-
-                            numLayersInput.addEventListener('input', () => {
-                                const numLayers = parseInt(numLayersInput.value);
-                                layerInputsDiv.innerHTML = '';
-
-                                for (let i = 1; i <= numLayers; i++) {
-                                    const layerInput = document.createElement('input');
-                                    layerInput.type = 'number';
-                                    layerInput.min = 1;
-                                    layerInput.required = true;
-                                    layerInput.style.width = '50px';
-
-                                    const layerLabel = document.createElement('label');
-                                    layerLabel.textContent = `Neurônios da ${i}ª camada:`;
-                                    layerLabel.style.marginRight = '10px';
-
-                                    const layerContainer = document.createElement('div');
-                                    layerContainer.style.marginRight = '20px';
-                                    layerContainer.appendChild(layerLabel);
-                                    layerContainer.appendChild(layerInput);
-
-                                    layerInputsDiv.appendChild(layerContainer);
-                                }
-                            });
-                        });
-
-                        document.getElementById('removeConfiguracao').addEventListener('click', () => {
-                            const configuracoes = document.getElementById('configuracoes');
-                            if (configuracoes.lastChild) {
-                                configuracoes.removeChild(configuracoes.lastChild);
-                                configuracaoCount--;
-                            }
+                                    validateStep2Live();
+                                    toggleFiltersContainer();
+                                    validateInputs();
+                                })
+                                .catch(error => {
+                                    console.error('Erro ao carregar dataset:', error);
+                                    document.getElementById('datasetFileName').innerText = 'No dataset selected';
+                                    toggleFiltersContainer();
+                                    validateStep2Live();
+                                });
                         });
                     </script>
-                </div>
-                <div class="setorPreprocess">
-                    <div class="titulo" style="padding: 7px;" onclick="expandirRetangulo(this.parentNode)">
-                        Número de Épocas
-                    </div>
-                    <div class="conteudoSetorPreprocess">
-                        <p style="display: flex; align-items: center; text-align: center;">
-                            Número máximo de iterações (épocas) para o algoritmo de otimização.
-                        </p>
-                        <div style="text-align: center; margin-left: 10px;">
-                            <form id="epochForm">
-                                <label for="epoch1">Menor valor do intervalo:</label>
-                                <input type="number" id="epoch1" name="epoch1" min="0" step="100" value="1000"
-                                    style="margin-right: 20px" required>
-                                <label for="epoch2">Maior valor do intervalo:</label>
-                                <input type="number" id="epoch2" name="epoch2" min="0" step="100" value="10000"
-                                    style="margin-right: 20px" required>
-                                <p id="error-message-epoch" style="color: red;"></p>
-                            </form>
-                            <script>
-                                const epoch1Input = document.getElementById('epoch1');
-                                const epoch2Input = document.getElementById('epoch2');
-                                const errorMessageEpoch = document.getElementById('error-message-epoch');
+                    <script>
+                        // Fake FileInput
+                        const fakeFileInput = document.getElementById('fakeFileInput');
+                        const fileInput = document.getElementById('fileInput');
 
-                                function validateInputs() {
-                                    const epoch1Value = parseFloat(epoch1Input.value);
-                                    const epoch2Value = parseFloat(epoch2Input.value);
+                        fakeFileInput.addEventListener('click', () => {
+                            fileInput.click();
+                        });
 
-                                    // Atualiza os limites conforme as restrições
-                                    epoch1Input.max = epoch2Value;
-                                    epoch2Input.min = epoch1Value;
+                        fileInput.addEventListener('change', () => {
+                            document.getElementById('uploadButton').click();
+                        });
 
-                                    // Verifica se os valores inseridos são válidos
-                                    if (epoch1Value > epoch2Value) {
-                                        errorMessageEpoch.innerText = "O valor inicial não pode ser maior que o valor final.";
-                                    } else if (epoch2Value < epoch1Value) {
-                                        errorMessageEpoch.innerText = "O valor final não pode ser menor que o valor inicial.";
-                                    } else {
-                                        errorMessageEpoch.innerText = ""; // Limpa mensagem de erro se tudo está válido
+                        // Add event listener to form submission
+                        document.getElementById('wizardForm').addEventListener('submit', function (event) {
+                            event.preventDefault(); // Evita o envio padrão do formulário
+
+                            var formData = new FormData(); // Cria um objeto FormData para armazenar os dados do formulário
+                            var fileInput = document.getElementById('fileInput');
+                            formData.append('uploadDataset', fileInput.files[0]); // Adiciona o arquivo ao FormData
+
+                            // Exibe a mensagem de upload em progresso
+                            document.getElementById('uploadStatus').textContent = 'Upload in progress...';
+
+                            // Envia os dados do formulário usando fetch
+                            fetch('/uploadDataset', {
+                                method: 'POST',
+                                body: formData
+                            })
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error('Network response was not ok');
                                     }
-                                }
+                                    // Limpa a mensagem de upload
+                                    document.getElementById('uploadStatus').textContent = '';
 
-                                // Adiciona eventos para validar os inputs em cada alteração
-                                epoch1Input.addEventListener('input', validateInputs);
-                                epoch2Input.addEventListener('input', validateInputs);
-                            </script>
+                                    // Busca o nome do dataset atualizado
+                                    return fetch('/datasetFileName');
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    console.log(data); // Para depuração
+                                    document.getElementById('datasetFileName').innerText = 'Dataset: ' + data.fileName;
+                                    document.getElementById('k2').max = data.numVariaveis;
+                                    document.getElementById('k2').value = data.numVariaveis;
+
+                                    validateStep2Live();
+                                    toggleFiltersContainer();
+                                    validateInputs();
+                                    fetchVariables();
+                                })
+                                .catch(error => {
+                                    console.error('There was a problem with the file upload:', error);
+                                    // Display upload failed message
+                                    document.getElementById('uploadStatus').textContent = 'Upload failed. Please try again';
+                                    toggleFiltersContainer();
+                                    validateStep2Live();
+                                });
+                        });
+                    </script>
+                    <div class="filters-container">
+                        <div class="filter-group">
+                            <p>Select your model's <b style="color: #008c9e;">target feature</b>:</p>
+                            <div class="search-filter">
+                                <input type="text" id="search-target" placeholder="Type to search..."
+                                    onkeyup="filterOptions('target')">
+                                <div id="checkbox-list-target" class="checkbox-list"></div>
+                            </div>
                         </div>
+
+                        <div class="filter-group">
+                            <p>Select your <b style="color: #008c9e;">unwanted features</b> to be deleted:</p>
+                            <div class="search-filter">
+                                <input type="text" id="search-deleted" placeholder="Type to search..."
+                                    onkeyup="filterOptions('deleted')">
+                                <div id="checkbox-list-deleted" class="checkbox-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        const datasetName = document.getElementById('datasetFileName');
+                        const filtersContainer = document.getElementsByClassName('filters-container')[0];
+
+                        function toggleFiltersContainer() {
+                            if (datasetName.innerText == "No dataset selected") {
+                                filtersContainer.style.display = 'none';
+                            } else {
+                                filtersContainer.style.display = 'flex';
+                            }
+                        }
+
+                        // Rodar no carregamento inicial
+                        toggleFiltersContainer();
+                    </script>
+                    <script>
+                        let options = [];
+                        const selectedTarget = {};
+                        const selectedDeleted = {};
+
+                        function fetchVariables() {
+                            fetch('/datasetFileName')
+                                .then(response => response.json())
+                                .then(data => {
+                                    options = data.variaveis;
+                                    filterOptions('target');
+                                    filterOptions('deleted');
+                                })
+                                .catch(error => console.error('Erro ao buscar as variáveis:', error));
+                        }
+
+                        function updateSelection(checkbox, type) {
+                            const selectedGroup = type === 'target' ? selectedTarget : selectedDeleted;
+                            const otherGroup = type === 'target' ? selectedDeleted : selectedTarget;
+
+                            if (type === 'target') {
+                                document.querySelectorAll('#checkbox-list-target input[type="checkbox"]').forEach(cb => {
+                                    if (cb !== checkbox) {
+                                        cb.checked = false;
+                                        delete selectedTarget[cb.value];
+                                    }
+                                });
+                            }
+
+                            if (checkbox.checked) {
+                                selectedGroup[checkbox.value] = true;
+                                delete otherGroup[checkbox.value];
+
+                                if (type === 'target') {
+                                    validateStep2Live();
+                                }
+                            } else {
+                                delete selectedGroup[checkbox.value];
+                                if (type === 'target') {
+                                    validateStep2Live();
+                                }
+                            }
+
+                            filterOptions('target');
+                            filterOptions('deleted');
+                        }
+
+                        function filterOptions(type) {
+                            const searchValue = document.getElementById(`search-${type}`).value.toLowerCase();
+                            const checkboxList = document.getElementById(`checkbox-list-${type}`);
+                            checkboxList.innerHTML = '';
+
+                            const otherSelections = type === 'target' ? selectedDeleted : selectedTarget;
+                            const filteredOptions = options.filter(option =>
+                                option.toLowerCase().includes(searchValue) && !otherSelections[option]
+                            );
+
+                            filteredOptions.forEach(option => {
+                                const checkboxContainer = document.createElement('label');
+                                checkboxContainer.className = 'checkbox-option';
+                                const checkboxId = `checkbox-${type}-${option.replace(/\s+/g, '-')}`;
+                                const isChecked = (type === 'target' ? selectedTarget : selectedDeleted)[option] || false;
+
+                                checkboxContainer.innerHTML = `
+                                    <input type="checkbox" id="${checkboxId}" class="checkbox-input" 
+                                        value="${option}" ${isChecked ? 'checked' : ''}>
+                                    <span class="checkbox-custom"></span>
+                                    <span class="checkbox-label">${option}</span>
+                                `;
+
+                                const inputElement = checkboxContainer.querySelector('input');
+                                inputElement.addEventListener('change', function () {
+                                    updateSelection(this, type);
+                                });
+
+                                checkboxList.appendChild(checkboxContainer);
+                            });
+                        }
+
+                        fetchVariables();
+                    </script>
+                    <div id="error-message-step2" class="error-message" style="margin-top: 0.5rem;"></div>
+                </div>
+                <script>
+                    function validateStep2Live() {
+                        const datasetName = document.getElementById('datasetFileName');
+                        const errorMessageStep2 = document.getElementById('error-message-step2');
+                        const targetChecked = document.querySelectorAll('#checkbox-list-target input[type="checkbox"]:checked').length;
+
+                        if (datasetName.innerText === "No dataset selected") {
+                            errorMessageStep2.innerText = "Select your dataset";
+                        } else if (targetChecked === 0) {
+                            errorMessageStep2.innerText = "Select your model's target feature";
+                        } else {
+                            errorMessageStep2.innerText = "";
+                        }
+                    }
+                </script>
+            </div>
+
+            <div class="step" id="step3">
+                <div class="step-title">Preprocessing</div>
+                <div class="step-content">
+                    <div class="checkbox-group">
+                        <h4 class="checkbox-group-title">Feature Scaling</h4>
+                        <span class="checkbox-group-description">Choose which scaling techniques to be applied to your
+                            data.</span>
+                        <div class="checkbox-options">
+                            <label class="checkbox-option" for="minmax">
+                                <input type="checkbox" id="minmax" checked class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">MinMax Scaler</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">Transforms features by scaling each feature to a given
+                                        range [0, 1]. Preserves the shape of the original distribution.</span>
+                                </div>
+                            </label>
+
+                            <label class="checkbox-option" for="standard">
+                                <input type="checkbox" id="standard" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Standard Scaler</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">Standardizes features by removing the mean and scaling to
+                                        unit variance. Works well when data follows Gaussian distribution.</span>
+                                </div>
+                            </label>
+
+                            <label class="checkbox-option" for="robust" style="display:none;">
+                                <input type="checkbox" id="robust" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Robust Scaler</span>
+                            </label>
+                        </div>
+                        <div id="error-message-FS" class="error-message" style="margin-top: 0.5rem;"></div>
+                    </div>
+                    <script>
+                        const checkboxMinMax = document.getElementById('minmax');
+                        const checkboxStandard = document.getElementById('standard');
+                        const errorMessageFS = document.getElementById('error-message-FS');
+
+                        function validateFS() {
+                            if (!checkboxMinMax.checked && !checkboxStandard.checked) {
+                                errorMessageFS.innerText = "Select at least one scaling technique to be applied to your data.";
+                            } else {
+                                errorMessageFS.innerText = "";
+                            }
+                        }
+
+                        // Rodar no carregamento inicial
+                        validateFS();
+
+                        // Adicionar listeners
+                        checkboxMinMax.addEventListener('change', validateFS);
+                        checkboxStandard.addEventListener('change', validateFS);
+                    </script>
+                    <div class="checkbox-group" style="max-width: 60%;">
+                        <h4 class="checkbox-group-title">Feature Selection</h4>
+                        <span class="checkbox-group-description">Select the parameters for the filter-based feature
+                            selection method <b>Select K Best</b>
+                            <div class="tooltip-container option-tooltip" style="margin-left: 0rem;">
+                                <span class="tooltip-icon">?</span>
+                                <span class="tooltip-text">Method that selects the top <i>k</i> features based on
+                                    univariate
+                                    statistical tests, helping reduce dimensionality and improve model performance.
+                                </span>
+                            </div>.
+                        </span>
+
+                        <p style="color: #2c3e50; font-size: 1.3rem;">Choose which score function to be used:</p>
+                        <div class="checkbox-options">
+                            <label class="checkbox-option" for="f_classif">
+                                <input type="checkbox" id="f_classif" checked class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">ANOVA F-value</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">Evaluates the linear relationship
+                                        between each numeric
+                                        feature and the target by comparing variance between and within classes. Assumes
+                                        normally distributed data with equal variances.
+                                    </span>
+                                </div>
+                            </label>
+
+                            <label class="checkbox-option" for="chi2">
+                                <input type="checkbox" id="chi2" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Chi-squared Test</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">Measures the dependence between each feature and the
+                                        target variable. Best for categorical data; assumes non-negative features.
+                                        Higher scores indicate more dependency and greater relevance for
+                                        classification.</span>
+                                </div>
+                            </label>
+                            <label class="checkbox-option" for="mutual_info_classif">
+                                <input type="checkbox" id="mutual_info_classif" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Mutual Information</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">Estimates the mutual dependence between each feature and
+                                        the target. Captures both linear and non-linear relationships. Works well with
+                                        both discrete and continuous data, without strong assumptions.</span>
+                                </div>
+                            </label>
+                        </div>
+                        <div id="error-message-SF" class="error-message" style="margin-top: 0.5rem;"></div>
+                        <script>
+                            const checkboxFClassif = document.getElementById('f_classif');
+                            const checkboxChi2 = document.getElementById('chi2');
+                            const checkboxMutualInfoClassif = document.getElementById('mutual_info_classif');
+                            const errorMessageSF = document.getElementById('error-message-SF');
+
+                            function validateSF() {
+                                if (!checkboxFClassif.checked && !checkboxChi2.checked & !checkboxMutualInfoClassif.checked) {
+                                    errorMessageSF.innerText = "Select at least one scaling technique to be applied to your data.";
+                                } else {
+                                    errorMessageSF.innerText = "";
+                                }
+                            }
+
+                            // Rodar no carregamento inicial
+                            validateSF();
+
+                            // Adicionar listeners
+                            checkboxFClassif.addEventListener('change', validateSF);
+                            checkboxChi2.addEventListener('change', validateSF);
+                            checkboxMutualInfoClassif.addEventListener('change', validateSF);
+                        </script>
+                        <p style="color: #2c3e50; font-size: 1.3rem; margin-top: 1.5rem;">Choose the range of the
+                            parameter <i>k</i>
+                            to be used:</p>
+                        <div class="range-inputs">
+                            <div class="input-group">
+                                <label for="k1" class="input-label">Minimun value:</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="k1" name="k1" min="1" value="1" class="range-input"
+                                        required>
+                                </div>
+                            </div>
+                            <div class="range-separator">to</div>
+                            <div class="input-group">
+                                <label for="k2" class="input-label">Maximun value:</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="k2" name="k2" min="1" class="range-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="error-message-k" class="error-message"></div>
+                        <script>
+                            const k1Input = document.getElementById('k1');
+                            const k2Input = document.getElementById('k2');
+                            const errorMessageK = document.getElementById('error-message-k');
+
+                            function validateInputs() {
+                                const k1Value = parseInt(k1Input.value) || 0;
+                                const k2Value = parseInt(k2Input.value) || 0;
+
+                                // Atualiza os limites conforme as restrições
+                                k1Input.max = k2Value;
+                                k2Input.min = k1Value;
+
+                                // Verifica se os valores inseridos são válidos
+                                if (k1Value < k1Input.min || k1Value > k2Value) {
+                                    errorMessageK.innerText = "The minimun value must be greater than or equal to 1 and less than or equal to the maximun value.";
+                                } else if (k2Value < k1Value || k2Value > k2Input.max) {
+                                    errorMessageK.innerText = "The maximun value must be greater than or equal to the minimun value and less than or equal to the number of characteristics.";
+                                } else {
+                                    errorMessageK.innerText = ""; // Limpa mensagem de erro se tudo está válido
+                                }
+                            }
+
+                            // Adiciona eventos para validar os inputs em cada alteração
+                            k1Input.addEventListener('input', validateInputs);
+                            k2Input.addEventListener('input', validateInputs);
+                        </script>
                     </div>
                 </div>
             </div>
-        </div>
-        <p></p>
-        <label for="nTrials" style="margin-right: 10px; color: #333; font-weight: bold;">Quantidade de configurações
-            testadas pelo Optuna<span class="tooltip">?
-                <span class="tooltip-text">É
-                    utilizado uma biblioteca chamada Optuna para encontrar os melhores hiperparâmetros do
-                    modelo. Quanto maior o número de configurações testadas, mais tempo leva para encontrar os melhores
-                    hiperparâmetros.</span>
-            </span>:</label>
-        <input type="number" id="nTrials" name="nTrials" min="0" value="50" style="margin-right: 20px" required>
-        <p id="explain_sf" style="margin-left: 10px; max-width: calc(50%); margin-top: 0; margin-bottom: 30px;"> </p>
-        <button id="gerarConfig">Gerar</button>
-        <p id="error-message" style="color: red;"></p>
-        <script>
-            document.getElementById('gerarConfig').addEventListener('click', () => {
-                const errorMessage = document.getElementById('error-message');
+            <div class="step" id="step4">
+                <div class="step-title">MLP Hyperparameters</div>
+                <div class="step-content">
+                    <div class="checkbox-group">
+                        <h4 class="checkbox-group-title">Activation Function</h4>
+                        <span class="checkbox-group-description">Choose which <b>activation functions</b>
+                            <div class="tooltip-container option-tooltip"
+                                style="margin-left: 0rem; margin-right: 0.2rem;">
+                                <span class="tooltip-icon">?</span>
+                                <span class="tooltip-text">Determines the output of a neuron by applying a mathematical
+                                    transformation to its input. It introduces non-linearity into the network, which
+                                    allows the model to learn complex relationships and make accurate
+                                    predictions.</span>
+                            </div>to be used.
+                        </span>
+                        <div class="checkbox-options">
+                            <label class="checkbox-option" for="relu">
+                                <input type="checkbox" id="relu" checked class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Rectified Linear Unit</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">(relu) Outputs zero for negative values and linear for
+                                        positive ones.</span>
+                                </div>
+                            </label>
 
-                // Numero de folds
-                const foldInput = parseInt(document.getElementById('foldInput').value);
+                            <label class="checkbox-option" for="logistic">
+                                <input type="checkbox" id="logistic" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Sigmoid function</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">(logistic) Squashes input values between 0 and 1.</span>
+                                </div>
+                            </label>
 
-                let foldConfig = '';
-                if (foldInput) {
-                    if (foldInput < 2) {
-                        errorMessage.innerText = "O valor deve ser maior que 1.";
-                    } else {
-                        errorMessage.innerText = "";
-                        foldConfig = `NumFolds: ${foldInput}`;
-                    }
-                }
+                            <label class="checkbox-option" for="tanh">
+                                <input type="checkbox" id="tanh" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Hyperbolic tangent</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">(tanh) Squashes inputs between -1 and 1, zero-centered.
+                                    </span>
+                                </div>
+                            </label>
 
-                //Solver
-                const minmax = document.getElementById('minmax').checked;
-                const standard = document.getElementById('standard').checked;
-                const robust = document.getElementById('robust').checked;
+                            <label class="checkbox-option" for="identity">
+                                <input type="checkbox" id="identity" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Identity</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">(identity) No transformation is applied, the output is
+                                        the same as the input.
+                                    </span>
+                                </div>
+                            </label>
+                        </div>
+                        <div id="error-message-AF" class="error-message" style="margin-top: 0.5rem;"></div>
+                    </div>
+                    <script>
+                        const checkboxRELU = document.getElementById('relu');
+                        const checkboxLogistic = document.getElementById('logistic');
+                        const checkboxTanh = document.getElementById('tanh');
+                        const checkboxIdentity = document.getElementById('identity');
+                        const errorMessageAF = document.getElementById('error-message-AF');
 
-                let sacalerConfig = '';
-                if (minmax || standard || robust) {
-                    let scalerValues = [];
-                    if (minmax) scalerValues.push('MinMaxScaler');
-                    if (standard) scalerValues.push('StandardScaler');
-                    if (robust) scalerValues.push('RobustScaler');
-                    scalerConfig = `Scalers: ${scalerValues.join(', ')}`;
-                }
-
-                //K
-                const k1Input = parseInt(document.getElementById('k1').value);
-                const k2Input = parseInt(document.getElementById('k2').value);
-
-                let kConfig = '';
-                if (k1Input && k2Input) {
-                    if (k1Input > k2Input) {
-                        errorMessage.innerText = "O valor inicial não pode ser maior que o valor final para o parâmetro K ";
-                    } else if (k2Input < k1Input) {
-                        errorMessage.innerText = "O valor final não pode ser menor que o valor inicial para  o parâmetro K.";
-                    } else {
-                        errorMessage.innerText = "";
-                        kConfig = `minK: ${k1Input}, maxK: ${k2Input}`;
-                    }
-                }
-
-                //Score Function
-                const f_classif = document.getElementById('f_classif').checked;
-                const chi2 = document.getElementById('chi2').checked;
-                const mutual_info_classif = document.getElementById('mutual_info_classif').checked;
-
-                let scoreFunctionConfig = '';
-                if (f_classif || chi2 || mutual_info_classif) {
-                    let scoreFunctionValues = [];
-                    if (f_classif) scoreFunctionValues.push('f_classif');
-                    if (chi2) scoreFunctionValues.push('chi2');
-                    if (mutual_info_classif) scoreFunctionValues.push('mutual_info_classif');
-                    scoreFunctionConfig = `Score Function: ${scoreFunctionValues.join(', ')}`;
-                }
-
-                //Activation Funcion
-                const relu = document.getElementById('relu').checked;
-                const logistic = document.getElementById('logistic').checked;
-                const tanh = document.getElementById('tanh').checked;
-                const identity = document.getElementById('identity').checked;
-
-                let activationFunctionConfig = '';
-                if (relu || logistic || tanh || identity) {
-                    let activationFunctionValues = [];
-                    if (relu) activationFunctionValues.push('relu');
-                    if (logistic) activationFunctionValues.push('logistic');
-                    if (tanh) activationFunctionValues.push('tanh');
-                    if (identity) activationFunctionValues.push('identity');
-                    activationFunctionConfig = `Activation Function: ${activationFunctionValues.join(', ')}`;
-                }
-
-                //Solver
-                const adam = document.getElementById('adam').checked;
-                const lbfgs = document.getElementById('lbfgs').checked;
-                const sgd = document.getElementById('sgd').checked;
-
-                let solverConfig = '';
-                if (adam || lbfgs || sgd) {
-                    let solverValues = [];
-                    if (adam) solverValues.push('adam');
-                    if (lbfgs) solverValues.push('lbfgs');
-                    if (sgd) solverValues.push('sgd');
-                    solverConfig = `Solver: ${solverValues.join(', ')}`;
-                }
-
-                //Taxa de Aprendizado
-                const constant = document.getElementById('constant').checked;
-                const adaptive = document.getElementById('adaptive').checked;
-                const invscaling = document.getElementById('invscaling').checked;
-
-                let learningRateConfig = '';
-                if (constant || adaptive || invscaling) {
-                    let learningRateValues = [];
-                    if (constant) learningRateValues.push('constant');
-                    if (adaptive) learningRateValues.push('adaptive');
-                    if (invscaling) learningRateValues.push('invscaling');
-                    learningRateConfig = `Learning Rate: ${learningRateValues.join(', ')}`;
-                }
-
-                // Taxa de Aprendizado Inicial
-                const lr1Input = parseFloat(document.getElementById('lr1').value);
-                const lr2Input = parseFloat(document.getElementById('lr2').value);
-
-                let lrConfig = '';
-                if (lr1Input && lr2Input) {
-                    if (lr1Input > lr2Input) {
-                        errorMessage.innerText = "O valor inicial não pode ser maior que o valor final para a Taxa de Aprendizado Inicial.";
-                    } else if (lr2Input < lr1Input) {
-                        errorMessage.innerText = "O valor final não pode ser menor que o valor inicial para a Taxa de Aprendizado Inicial.";
-                    } else {
-                        errorMessageLR.innerText = "";
-                        lrConfig = `minLearningRateInit: ${lr1Input}, maxLearningRateInit: ${lr2Input}`;
-                    }
-                }
-
-                // Alfa
-                const alpha1Input = parseFloat(document.getElementById('alpha1').value);
-                const alpha2Input = parseFloat(document.getElementById('alpha2').value);
-
-                let alfaConfig = '';
-                if (alpha1Input && alpha2Input) {
-                    if (alpha1Input > alpha2Input) {
-                        errorMessage.innerText = "O valor inicial não pode ser maior que o valor final para o Alfa.";
-                    } else if (alpha2Input < alpha1Input) {
-                        errorMessage.innerText = "O valor final não pode ser menor que o valor inicial para o Alfa.";
-                    } else {
-                        errorMessage.innerText = "";
-                        alfaConfig = `minAlfa: ${alpha1Input}, maxAlfa: ${alpha2Input}`;
-                    }
-                }
-
-                // Camada Oculta
-                const configuracoes = document.getElementById('configuracoes').children;
-                const hiddenLayerSizes = [];
-
-                let hiddenLayerConfig = '';
-                if (configuracoes) {
-                    for (let configuracao of configuracoes) {
-                        const numLayersInput = configuracao.querySelector('#numLayers');
-                        const layerInputsDiv = configuracao.querySelectorAll('#layerInputs input');
-
-                        const numLayers = parseInt(numLayersInput.value);
-                        const layerSizes = [];
-
-                        // Captura o valor de neurônios de cada camada
-                        for (let i = 0; i < numLayers; i++) {
-                            const neuronios = parseInt(layerInputsDiv[i].value);
-                            if (!isNaN(neuronios)) {
-                                layerSizes.push(neuronios);
+                        function validateAF() {
+                            if (!checkboxRELU.checked && !checkboxLogistic.checked && !checkboxTanh.checked && !checkboxIdentity.checked) {
+                                errorMessageAF.innerText = "Select at least one activation function to be used.";
+                            } else {
+                                errorMessageAF.innerText = "";
                             }
                         }
 
-                        // Adiciona ao array no formato de tupla
-                        if (layerSizes.length > 0) {
-                            hiddenLayerSizes.push(`(${layerSizes.join(', ')})`);
+                        // Rodar no carregamento inicial
+                        validateAF();
+
+                        // Adicionar listeners
+                        checkboxRELU.addEventListener('change', validateAF);
+                        checkboxLogistic.addEventListener('change', validateAF);
+                        checkboxTanh.addEventListener('change', validateAF);
+                        checkboxIdentity.addEventListener('change', validateAF);
+                    </script>
+                    <div class="checkbox-group">
+                        <h4 class="checkbox-group-title"> Alpha</h4>
+                        <span class="checkbox-group-description">Choose the range of <b>alpha</b>
+                            <div class="tooltip-container option-tooltip"
+                                style="margin-left: 0rem; margin-right: 0.1rem;">
+                                <span class="tooltip-icon">?</span>
+                                <span class="tooltip-text">Is the L2 regularization term. It helps prevent overfitting
+                                    by penalizing large weights in the model. Higher values make the model simpler but
+                                    may reduce accuracy; lower values allow more flexibility but can lead to
+                                    overfitting.
+                                </span>
+                            </div> to de used.
+                        </span>
+                        <div class="range-inputs">
+                            <div class="input-group">
+                                <label for="alpha1" class="input-label">Minimun value:</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="alpha1" name="alpha1" min="0.00001" max="0.1"
+                                        step="0.00001" value="0.00001" class="range-input">
+                                </div>
+                            </div>
+                            <div class="range-separator">to</div>
+                            <div class="input-group">
+                                <label for="alpha2" class="input-label">Maximun value:</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="alpha2" name="alpha2" min="0.00001" max="0.1"
+                                        step="0.00001" value="0.1" class="range-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="error-message-alpha" class="error-message"></div>
+                        <script>
+                            const alpha1Input = document.getElementById('alpha1');
+                            const alpha2Input = document.getElementById('alpha2');
+                            const errorMessageAlpha = document.getElementById('error-message-alpha');
+
+                            function validateInputs() {
+                                const alpha1Value = parseFloat(alpha1Input.value);
+                                const alpha2Value = parseFloat(alpha2Input.value);
+
+                                // Atualiza os limites conforme as restrições
+                                alpha1Input.max = alpha2Value;
+                                alpha2Input.min = alpha1Value;
+
+                                // Verifica se os valores inseridos são válidos
+                                if (alpha1Value < alpha1Input.min || alpha1Value > alpha2Value) {
+                                    errorMessageAlpha.innerText = "The minimun value must be greater than or equal to 0.00001 and less than or equal to the maximun value.";
+                                } else if (alpha2Value < alpha1Value || alpha2Value > alpha2Input.max) {
+                                    errorMessageAlpha.innerText = "The maximun value must be greater than or equal to the minimun value and less than or equal to 0.1.";
+                                } else {
+                                    errorMessageAlpha.innerText = ""; // Limpa mensagem de erro se tudo está válido
+                                }
+                            }
+
+                            // Adiciona eventos para validar os inputs em cada alteração
+                            alpha1Input.addEventListener('input', validateInputs);
+                            alpha2Input.addEventListener('input', validateInputs);
+                        </script>
+                    </div>
+                    <div class="checkbox-group">
+                        <h4 class="checkbox-group-title"> Maximum number of iterations</h4>
+                        <span class="checkbox-group-description">Choose the range of the <b>maximum number of
+                                iterations</b>
+                            <div class="tooltip-container option-tooltip"
+                                style="margin-left: 0rem; margin-right: 0.1rem;">
+                                <span class="tooltip-icon">?</span>
+                                <span class="tooltip-text">Defines the max number of training iterations. For 'sgd' and
+                                    'adam', it's the number of epochs. For 'lbfgs', it's the max optimizer steps. Each
+                                    iteration updates the model's weights based on the full dataset or batches,
+                                    depending on the solver.
+                                </span>
+                            </div> to de used.
+                        </span>
+                        <div class="range-inputs">
+                            <div class="input-group">
+                                <label for="epoch1" class="input-label">Minimun value:</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="epoch1" name="epoch1" min="0" step="100" value="1000"
+                                        class="range-input">
+                                </div>
+                            </div>
+                            <div class="range-separator">to</div>
+                            <div class="input-group">
+                                <label for="epoch2" class="input-label">Maximun value:</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="epoch2" name="epoch2" min="0" step="100" value="10000"
+                                        class="range-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="error-message-epoch" class="error-message"></div>
+                        <script>
+                            const epoch1Input = document.getElementById('epoch1');
+                            const epoch2Input = document.getElementById('epoch2');
+                            const errorMessageEpoch = document.getElementById('error-message-epoch');
+
+                            function validateInputs() {
+                                const epoch1Value = parseInt(epoch1Input.value) || 0;
+                                const epoch2Value = parseFloat(epoch2Input.value) || 0;
+
+                                // Atualiza os limites conforme as restrições
+                                epoch1Input.max = epoch2Value;
+                                epoch2Input.min = epoch1Value;
+
+                                // Verifica se os valores inseridos são válidos
+                                if (epoch1Value < epoch1Input.min || epoch1Value > epoch2Value) {
+                                    errorMessageEpoch.innerText = "The minimun value must be greater than or equal to 0 and less than or equal to the maximun value.";
+                                } else if (epoch2Value < epoch1Value) {
+                                    errorMessageEpoch.innerText = "The maximun value must be greater than or equal to the minimun value.";
+                                } else {
+                                    errorMessageEpoch.innerText = ""; // Limpa mensagem de erro se tudo está válido
+                                }
+                            }
+
+                            // Adiciona eventos para validar os inputs em cada alteração
+                            epoch1Input.addEventListener('input', validateInputs);
+                            epoch2Input.addEventListener('input', validateInputs);
+                        </script>
+                    </div>
+                </div>
+            </div>
+            <div class="step" id="step5">
+                <div class="step-title">MLP Hyperparameters</div>
+                <div class="step-content">
+                    <div class="checkbox-group">
+                        <h4 class="checkbox-group-title">Solver</h4>
+                        <span class="checkbox-group-description">Choose which algorithm for weights optimization to be
+                            used.</span>
+                        <div class="checkbox-options">
+                            <label class="checkbox-option" for="adam">
+                                <input type="checkbox" id="adam" checked class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Adaptive Moment Estimation</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">(adam) It uses adaptive learning
+                                        rates and momentum, making it efficient and robust for large datasets and noisy
+                                        gradients.</span>
+                                </div>
+                            </label>
+
+                            <label class="checkbox-option" for="lbfgs">
+                                <input type="checkbox" id="lbfgs" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Limited-memory BFGS</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">(lbfgs) A quasi-Newton optimization method that uses
+                                        approximations of the second derivative. It's a deterministic and
+                                        memory-efficient algorithm, well-suited for smaller datasets.</span>
+                                </div>
+                            </label>
+
+                            <label class="checkbox-option" for="sgd">
+                                <input type="checkbox" id="sgd" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Stochastic Gradient Descent</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">(sgd) Updates weights using one training example at a
+                                        time. It's simple and flexible, but may require careful tuning of the learning
+                                        rate and momentum. Can converge faster with good hyperparameter settings.
+                                    </span>
+                                </div>
+                            </label>
+                        </div>
+                        <div id="error-message-solver" class="error-message" style="margin-top: 0.5rem;"></div>
+                    </div>
+                    <script>
+                        const checkboxAdam = document.getElementById('adam');
+                        const checkboxLBFGS = document.getElementById('lbfgs');
+                        const checkboxSGD = document.getElementById('sgd');
+                        const errorMessageSolver = document.getElementById('error-message-solver');
+
+                        function validateSolver() {
+                            if (!checkboxAdam.checked && !checkboxLBFGS.checked && !checkboxSGD.checked) {
+                                errorMessageSolver.innerText = "Select at least one solver to be used.";
+                            } else {
+                                errorMessageSolver.innerText = "";
+                            }
                         }
-                    }
-                    // Monta a string no formato Grid Search
-                    hiddenLayerConfig = `Hidden Layer Sizes: ${hiddenLayerSizes.join(', ')}`;
-                }
 
-                // Número de Épocas
-                const epoch1Input = parseInt(document.getElementById('epoch1').value);
-                const epoch2Input = parseInt(document.getElementById('epoch2').value);
+                        // Rodar no carregamento inicial
+                        validateSolver();
 
-                let epochConfig = '';
-                if (epoch1Input && epoch2Input) {
-                    if (epoch1Input > epoch2Input) {
-                        errorMessage.innerText = "O valor inicial não pode ser maior que o valor final para o Número de Épocas.";
-                    } else if (epoch2Input < epoch1Input) {
-                        errorMessage.innerText = "O valor final não pode ser menor que o valor inicial para o Número de Épocas.";
-                    } else {
-                        errorMessage.innerText = "";
-                        epochConfig = `minEpochs: ${epoch1Input}, maxEpochs: ${epoch2Input}`;
-                    }
-                }
+                        // Adicionar listeners
+                        checkboxAdam.addEventListener('change', validateSolver);
+                        checkboxLBFGS.addEventListener('change', validateSolver);
+                        checkboxSGD.addEventListener('change', validateSolver);
+                    </script>
+                    <div class="checkbox-group" id="learning-rate-group">
+                        <h4 class="checkbox-group-title">Learning Rate Schedule</h4>
+                        <span class="checkbox-group-description">Choose which learning rate schedule to be used for
+                            weights
+                            updates.<div class="tooltip-container option-tooltip">
+                                <span class="tooltip-icon">?</span>
+                                <span class="tooltip-text">Only used when the solver is Stochastic Gradient Descent.
+                                </span>
+                            </div></span>
+                        <div class="checkbox-options">
+                            <label class="checkbox-option" for="constant">
+                                <input type="checkbox" id="constant" checked class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Constant</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">Uses the same learning rate, given by the initial
+                                        learning rate, throughout training .</span>
+                                </div>
+                            </label>
 
-                // Numero de Trials
-                const nTrialsInput = parseInt(document.getElementById('nTrials').value);
+                            <label class="checkbox-option" for="invscaling">
+                                <input type="checkbox" id="invscaling" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Invscaling</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">Decreases the learning rate over time using an inverse
+                                        scaling schedule.</span>
+                                </div>
+                            </label>
 
-                let nTrialsConfig = '';
-                if (nTrialsInput) {
-                    if (nTrialsInput <= 0) {
-                        errorMessage.innerText = "O valor deve ser maior que 0.";
-                    } else {
-                        errorMessage.innerText = "";
-                        nTrialsConfig = `NumTrials: ${nTrialsInput}`;
-                    }
-                }
+                            <label class="checkbox-option" for="adaptive">
+                                <input type="checkbox" id="adaptive" class="checkbox-input">
+                                <span class="checkbox-custom"></span>
+                                <span class="checkbox-label">Adaptive</span>
+                                <div class="tooltip-container option-tooltip">
+                                    <span class="tooltip-icon">?</span>
+                                    <span class="tooltip-text">Keeps the learning rate constant unless training loss
+                                        stops improving, then it reduces the rate.
+                                    </span>
+                                </div>
+                            </label>
+                        </div>
+                        <script>
+                            const sgdCheckbox = document.getElementById('sgd');
+                            const learningRateGroup = document.getElementById('learning-rate-group');
 
-                // Variável alvo e excluídas
-                const targetSelecionadas = [];
-                const deletedSelecionadas = [];
+                            function toggleLearningRateGroup() {
+                                if (sgdCheckbox.checked) {
+                                    learningRateGroup.style.display = 'block';
+                                } else {
+                                    learningRateGroup.style.display = 'none';
+                                }
+                            }
 
-                const variaveisTargetElements = document.querySelectorAll('#checkbox-list-target input:checked');
-                variaveisTargetElements.forEach(element => targetSelecionadas.push(element.value));
+                            // Rodar no carregamento inicial
+                            toggleLearningRateGroup();
 
-                const variaveisDeletedElements = document.querySelectorAll('#checkbox-list-deleted input:checked');
-                variaveisDeletedElements.forEach(element => deletedSelecionadas.push(element.value));
+                            // Adicionar listeners
+                            sgdCheckbox.addEventListener('change', toggleLearningRateGroup);
+                        </script>
+                        <div id="error-message-lr" class="error-message" style="margin-top: 0.5rem;"></div>
+                    </div>
+                    <script>
+                        const checkboxConstant = document.getElementById('constant');
+                        const checkboxInvscaling = document.getElementById('invscaling');
+                        const checkboxAdaptive = document.getElementById('adaptive');
+                        const errorMessageLR = document.getElementById('error-message-lr');
 
-                const conteudoFinal = `${foldConfig}\n${scalerConfig}\n${kConfig}\n${scoreFunctionConfig}\n${activationFunctionConfig}\n${solverConfig}\n${learningRateConfig}\n${lrConfig}\n${alfaConfig}\n${hiddenLayerConfig}\n${epochConfig}\n${nTrialsConfig}\nVar Target: ${targetSelecionadas.join(', ')}\nVar Deleted: ${deletedSelecionadas.join(', ')}`;
+                        function validateLR() {
+                            if (!checkboxConstant.checked && !checkboxInvscaling.checked && !checkboxAdaptive.checked) {
+                                errorMessageLR.innerText = "Select at least one learning rate schedule to be used.";
+                            } else {
+                                errorMessageLR.innerText = "";
+                            }
+                        }
 
-                fetch('/trainGridModel', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({conteudoFinal}),
-                })
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log("Best Params:", data.best_params);
-                        console.log("Best Value:", data.best_value);
-                    })
-                    .catch(error => {
-                        console.error('Erro ao executar o script:', error);
-                    });
-            });
-        </script>
-        <script>
-            window.onload = function () {
-                const retangulo = document.querySelector('.setorPreprocess');
-                const conteudo = retangulo.querySelector('.conteudoSetorPreprocess');
-                conteudo.style.display = "none";
-            }
+                        // Rodar no carregamento inicial
+                        validateLR();
 
-            function expandirRetangulo(retangulo) {
-                const conteudo = retangulo.querySelector('.conteudoSetorPreprocess');
-                if (conteudo.style.display === "block") {
-                    conteudo.style.display = "none";
-                    retangulo.style.height = "auto";
-                } else {
-                    conteudo.style.display = "block";
-                }
-            }
+                        // Adicionar listeners
+                        checkboxConstant.addEventListener('change', validateLR);
+                        checkboxInvscaling.addEventListener('change', validateLR);
+                        checkboxAdaptive.addEventListener('change', validateLR);
+                    </script>
+                    <div class="checkbox-group" id="initial-learning-rate-group">
+                        <h4 class="checkbox-group-title"> Initial Learning Rate</h4>
+                        <span class="checkbox-group-description">Choose the range of the initial learning rate to be
+                            used. It controls the
+                            step-size
+                            in updating the weights.<div class="tooltip-container option-tooltip">
+                                <span class="tooltip-icon">?</span>
+                                <span class="tooltip-text">Only used when the solver is Adaptive Moment Estimation or
+                                    Stochastic Gradient Descent.
+                                </span>
+                            </div> </span>
+                        <div class="range-inputs">
+                            <div class="input-group">
+                                <label for="lr1" class="input-label">Minimun value:</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="lr1" name="lr1" min="0.0001" max="0.1" step="0.0001"
+                                        value="0.0001" class="range-input">
+                                </div>
+                            </div>
+                            <div class="range-separator">to</div>
+                            <div class="input-group">
+                                <label for="lr2" class="input-label">Maximun value:</label>
+                                <div class="input-wrapper">
+                                    <input type="number" id="lr2" name="lr2" min="0.0001" max="0.1" step="0.0001"
+                                        value="0.1" class="range-input">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="error-message-ilr" class="error-message"></div>
+                        <script>
+                            const lr1Input = document.getElementById('lr1');
+                            const lr2Input = document.getElementById('lr2');
+                            const errorMessageILR = document.getElementById('error-message-ilr');
 
-            fetch('/datasetFileName')
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('datasetFileName').innerText = 'Dataset: ' + data.fileName;
-                })
-                .catch(error => console.error('Erro ao obter o nome do arquivo do dataset:', error));
-        </script>
+                            function validateInputs() {
+                                const lr1Value = parseFloat(lr1Input.value);
+                                const lr2Value = parseFloat(lr2Input.value);
+
+                                // Atualiza os limites conforme as restrições
+                                lr1Input.max = lr2Value;
+                                lr2Input.min = lr1Value;
+
+                                // Verifica se os valores inseridos são válidos
+                                if (lr1Value < lr1Input.min || lr1Value > lr2Value) {
+                                    errorMessageILR.innerText = "The minimun value must be greater than or equal to 0.0001 and less than or equal to the maximun value.";
+                                } else if (lr2Value < lr1Value || lr2Value > lr2Input.max) {
+                                    errorMessageILR.innerText = "The maximun value must be greater than or equal to the minimun value and less than or equal to 0.1.";
+                                } else {
+                                    errorMessageILR.innerText = "";
+                                }
+                            }
+
+                            // Adiciona eventos para validar os inputs em cada alteração
+                            lr1Input.addEventListener('input', validateInputs);
+                            lr2Input.addEventListener('input', validateInputs);
+                        </script>
+                        <script>
+                            const adamCheckbox = document.getElementById('adam');
+                            const initialLearningRateGroup = document.getElementById('initial-learning-rate-group');
+
+                            function toggleInitialLearningRateGroup() {
+                                if (adamCheckbox.checked || sgdCheckbox.checked) {
+                                    initialLearningRateGroup.style.display = 'block';
+                                } else {
+                                    initialLearningRateGroup.style.display = 'none';
+                                }
+                            }
+
+                            // Rodar no carregamento inicial
+                            toggleInitialLearningRateGroup();
+
+                            // Adicionar listeners
+                            adamCheckbox.addEventListener('change', toggleInitialLearningRateGroup);
+                            sgdCheckbox.addEventListener('change', toggleInitialLearningRateGroup);
+                        </script>
+                    </div>
+                </div>
+            </div>
+            <div class="step" id="step6">
+                <div class="step-title">MLP Hyperparameters</div>
+                <div class="step-content">
+                    <div class="checkbox-group">
+                        <h4 class="checkbox-group-title">Hidden Layer Configurations</h4>
+                        <span class="checkbox-group-description">Choose which hidden layer configurations to be
+                            used.</span>
+                        <div id="configs" style="max-height:70%; overflow-y: auto"></div>
+                        <div id="error-message-hl" class="error-message" style="margin-top: 5px;"> </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="addConfig" style="margin-left: 10px;">+</button>
+                            <button id="removeConfig">-</button>
+                        </div>
+                        <script>
+                            let configCount = 0;
+
+                            function getOrdinal(n) {
+                                const tens = n % 100;
+                                if (tens >= 11 && tens <= 13) return `${n}th`;
+                                const last = n % 10;
+                                if (last === 1) return `${n}st`;
+                                if (last === 2) return `${n}nd`;
+                                if (last === 3) return `${n}rd`;
+                                return `${n}th`;
+                            }
+
+                            function createConfig(isDefault = false) {
+                                configCount++;
+                                const configs = document.getElementById('configs');
+                                const newConfig = document.createElement('div');
+                                newConfig.className = 'hiddenLayerConfigSector';
+                                newConfig.id = `config${configCount}`;
+                                newConfig.innerHTML = `
+                                    <div class="title" style="padding: 7px;" onclick="expandRectangle(this.parentNode)">
+                                        Configuration ${configCount}
+                                    </div>
+                                    <div class="contentHiddenLayerConfig">
+                                        <div id="hiddenLayerForm">
+                                            <div class="input-row">
+                                                <p>Number of hidden layers:</p>
+                                                <div class="input-wrapper" style="width: 100px;">
+                                                    <input type="number" id="numLayers" name="numLayers" min="1" class="range-input" ${isDefault ? 'value="1"' : ''} required>
+                                                </div>
+                                            </div>
+                                            <div id="layerInputs" style="display: flex; flex-wrap: wrap; justify-content: center;"></div>
+                                        </div>
+                                    </div>
+                                `;
+                                configs.appendChild(newConfig);
+
+                                const numLayersInput = newConfig.querySelector('#numLayers');
+                                const layerInputsDiv = newConfig.querySelector('#layerInputs');
+
+                                function generateLayerInputs(numLayers, defaultValues = []) {
+                                    layerInputsDiv.innerHTML = '';
+                                    for (let i = 1; i <= numLayers; i++) {
+                                        const layerInput = document.createElement('input');
+                                        layerInput.type = 'number';
+                                        layerInput.min = 1;
+                                        layerInput.required = true;
+                                        layerInput.className = 'range-input';
+                                        layerInput.style.width = '100%';
+                                        if (defaultValues[i - 1]) {
+                                            layerInput.value = defaultValues[i - 1];
+                                        }
+
+                                        const layerLabel = document.createElement('p');
+                                        layerLabel.textContent = `Neurons of the ${getOrdinal(i)} layer:`;
+
+                                        const inputWrapper = document.createElement('div');
+                                        inputWrapper.className = 'input-wrapper';
+                                        inputWrapper.style.width = '100px';
+                                        inputWrapper.style.marginRight = '20px';
+                                        inputWrapper.appendChild(layerInput);
+
+                                        const inputRow = document.createElement('div');
+                                        inputRow.className = 'input-row';
+                                        inputRow.appendChild(layerLabel);
+                                        inputRow.appendChild(inputWrapper);
+
+                                        layerInputsDiv.appendChild(inputRow);
+                                    }
+                                }
+
+                                if (isDefault) {
+                                    generateLayerInputs(1, [100]);
+                                }
+
+                                numLayersInput.addEventListener('input', () => {
+                                    const numLayers = parseInt(numLayersInput.value);
+                                    const errorMessageHL = document.getElementById('error-message-hl');
+                                    if (numLayers > 150) {
+                                        errorMessageHL.innerText = "The maximum number of hidden layers must be less than or equal to 150.";
+                                        layerInputsDiv.innerHTML = '';
+                                    } else {
+                                        errorMessageHL.innerText = "";
+                                        generateLayerInputs(numLayers);
+                                    }
+                                    validateAllHiddenLayerConfigs()
+                                });
+
+                                layerInputsDiv.addEventListener('input', () => {
+                                    const errorMessageHL = document.getElementById('error-message-hl');
+                                    validateAllHiddenLayerConfigs()
+                                });
+
+                                validateAllHiddenLayerConfigs()
+                            }
+
+                            function expandRectangle(rectangle) {
+                                const content = rectangle.querySelector('.contentHiddenLayerConfig');
+                                content.style.display = content.style.display === "block" ? "none" : "block";
+                            }
+
+                            function validateAtLeastOneConfig() {
+                                const configs = document.getElementById('configs');
+                                const errorMessageHL = document.getElementById('error-message-hl');
+                                if (configs.childElementCount === 0) {
+                                    errorMessageHL.innerText = "Create at least one hidden layer configuration";
+                                    return false;
+                                }
+                                errorMessageHL.innerText = "";
+                                return true;
+                            }
+
+                            function validateConfigValues() {
+                                const configs = document.querySelectorAll('.hiddenLayerConfigSector');
+                                const errorMessageHL = document.getElementById('error-message-hl');
+                                for (const config of configs) {
+                                    const numLayersInput = config.querySelector('#numLayers');
+                                    if (!numLayersInput.value || parseInt(numLayersInput.value) <= 0) {
+                                        errorMessageHL.innerText = "All configurations must have number of layers greater than 0.";
+                                        return false;
+                                    }
+
+                                    const layerInputs = config.querySelectorAll('#layerInputs input');
+                                    if (layerInputs.length !== parseInt(numLayersInput.value)) {
+                                        errorMessageHL.innerText = "Each configuration must define neurons for all layers.";
+                                        return false;
+                                    }
+
+                                    for (const input of layerInputs) {
+                                        if (!input.value || parseInt(input.value) <= 0) {
+                                            errorMessageHL.innerText = "All layer neuron values must be greater than 0.";
+                                            return false;
+                                        }
+                                    }
+                                }
+                                errorMessageHL.innerText = "";
+                                return true;
+                            }
+
+                            document.getElementById('addConfig').addEventListener('click', (e) => {
+                                e.preventDefault();
+                                if (!validateConfigValues()) return;
+                                createConfig();
+                            });
+
+                            document.getElementById('removeConfig').addEventListener('click', (e) => {
+                                e.preventDefault();
+                                const configs = document.getElementById('configs');
+                                const errorMessageHL = document.getElementById('error-message-hl');
+                                errorMessageHL.innerText = "";
+                                if (configs.lastChild) {
+                                    configs.removeChild(configs.lastChild);
+                                    configCount--;
+                                }
+                                validateAtLeastOneConfig();
+                            });
+
+                            // Inicializa com configuração padrão
+                            window.addEventListener('DOMContentLoaded', () => {
+                                createConfig(1, [100]);
+                            });
+
+                            // Exporta validação final para uso externo
+                            function validateAllHiddenLayerConfigs() {
+                                return validateAtLeastOneConfig() && validateConfigValues();
+                            }
+                        </script>
+                    </div>
+                </div>
+            </div>
+            <div class="step" id="step7">
+                <div class="step-title">Model Training</div>
+                <div class="step-content">
+                    <div class="checkbox-group">
+                        <h4 class="checkbox-group-title">Number of trials</h4>
+                        <div class="input-row">
+                            <span class="checkbox-group-description"
+                                style="margin-bottom: 0rem; align-self: center;">Choose the number of trials that the
+                                TPE sampler
+                                will
+                                try:</span>
+                            <div class="input-wrapper" style="width: 100px;">
+                                <input type="number" id="nTrials" name="nTrials" min="1" value="50" class="range-input"
+                                    required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="checkbox-group">
+                        <h4 class="checkbox-group-title">Number of folds</h4>
+                        <div class="input-row">
+                            <span class="checkbox-group-description"
+                                style="margin-bottom: 0rem; align-self: center;">Choose the number of folds to be used
+                                at cross
+                                validation:</span>
+                            <div class="input-wrapper" style="width: 100px;">
+                                <input type="number" id="foldInput" name="foldInput" min="2" value="5"
+                                    class="range-input" required>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="gerarConfig">Train Model</button>
+                    <script>
+                        document.getElementById('gerarConfig').addEventListener('click', () => {
+                            const errorMessage = document.getElementById('error-message');
+
+                            // Numero de folds
+                            const foldInput = parseInt(document.getElementById('foldInput').value);
+
+                            let foldConfig = '';
+                            if (foldInput) {
+                                foldConfig = `NumFolds: ${foldInput}`;
+                            }
+
+                            //Scaling
+                            const minmax = document.getElementById('minmax').checked;
+                            const standard = document.getElementById('standard').checked;
+                            const robust = document.getElementById('robust').checked;
+
+                            let sacalerConfig = '';
+                            if (minmax || standard || robust) {
+                                let scalerValues = [];
+                                if (minmax) scalerValues.push('MinMaxScaler');
+                                if (standard) scalerValues.push('StandardScaler');
+                                if (robust) scalerValues.push('RobustScaler');
+                                scalerConfig = `Scalers: ${scalerValues.join(', ')}`;
+                            }
+
+                            //K
+                            const k1Input = parseInt(document.getElementById('k1').value);
+                            const k2Input = parseInt(document.getElementById('k2').value);
+
+                            let kConfig = '';
+                            if (k1Input && k2Input) {
+                                kConfig = `minK: ${k1Input}, maxK: ${k2Input}`;
+                            }
+
+                            //Score Function
+                            const f_classif = document.getElementById('f_classif').checked;
+                            const chi2 = document.getElementById('chi2').checked;
+                            const mutual_info_classif = document.getElementById('mutual_info_classif').checked;
+
+                            let scoreFunctionConfig = '';
+                            if (f_classif || chi2 || mutual_info_classif) {
+                                let scoreFunctionValues = [];
+                                if (f_classif) scoreFunctionValues.push('f_classif');
+                                if (chi2) scoreFunctionValues.push('chi2');
+                                if (mutual_info_classif) scoreFunctionValues.push('mutual_info_classif');
+                                scoreFunctionConfig = `Score Function: ${scoreFunctionValues.join(', ')}`;
+                            }
+
+                            //Activation Funcion
+                            const relu = document.getElementById('relu').checked;
+                            const logistic = document.getElementById('logistic').checked;
+                            const tanh = document.getElementById('tanh').checked;
+                            const identity = document.getElementById('identity').checked;
+
+                            let activationFunctionConfig = '';
+                            if (relu || logistic || tanh || identity) {
+                                let activationFunctionValues = [];
+                                if (relu) activationFunctionValues.push('relu');
+                                if (logistic) activationFunctionValues.push('logistic');
+                                if (tanh) activationFunctionValues.push('tanh');
+                                if (identity) activationFunctionValues.push('identity');
+                                activationFunctionConfig = `Activation Function: ${activationFunctionValues.join(', ')}`;
+                            }
+
+                            //Solver
+                            const adam = document.getElementById('adam').checked;
+                            const lbfgs = document.getElementById('lbfgs').checked;
+                            const sgd = document.getElementById('sgd').checked;
+
+                            let solverConfig = '';
+                            if (adam || lbfgs || sgd) {
+                                let solverValues = [];
+                                if (adam) solverValues.push('adam');
+                                if (lbfgs) solverValues.push('lbfgs');
+                                if (sgd) solverValues.push('sgd');
+                                solverConfig = `Solver: ${solverValues.join(', ')}`;
+                            }
+
+                            //Learning Rate
+                            const constant = document.getElementById('constant').checked;
+                            const adaptive = document.getElementById('adaptive').checked;
+                            const invscaling = document.getElementById('invscaling').checked;
+
+                            let learningRateConfig = '';
+                            if (constant || adaptive || invscaling) {
+                                let learningRateValues = [];
+                                if (constant) learningRateValues.push('constant');
+                                if (adaptive) learningRateValues.push('adaptive');
+                                if (invscaling) learningRateValues.push('invscaling');
+                                learningRateConfig = `Learning Rate: ${learningRateValues.join(', ')}`;
+                            }
+
+                            //Initial Learning Rate
+                            const lr1Input = parseFloat(document.getElementById('lr1').value);
+                            const lr2Input = parseFloat(document.getElementById('lr2').value);
+
+                            let lrConfig = '';
+                            if (lr1Input && lr2Input) {
+                                lrConfig = `minLearningRateInit: ${lr1Input}, maxLearningRateInit: ${lr2Input}`;
+                            }
+
+                            // Alfa
+                            const alpha1Input = parseFloat(document.getElementById('alpha1').value);
+                            const alpha2Input = parseFloat(document.getElementById('alpha2').value);
+
+                            let alfaConfig = '';
+                            if (alpha1Input && alpha2Input) {
+                                alfaConfig = `minAlfa: ${alpha1Input}, maxAlfa: ${alpha2Input}`;
+                            }
+
+                            // Hidden Layer
+                            const configs = document.getElementById('configs').children;
+                            const hiddenLayerSizes = [];
+
+                            let hiddenLayerConfig = '';
+                            if (configs) {
+                                for (let configuracao of configs) {
+                                    const numLayersInput = configuracao.querySelector('#numLayers');
+                                    const layerInputsDiv = configuracao.querySelectorAll('#layerInputs input');
+
+                                    const numLayers = parseInt(numLayersInput.value);
+                                    const layerSizes = [];
+
+                                    // Captura o valor de neurônios de cada camada
+                                    for (let i = 0; i < numLayers; i++) {
+                                        const neuronios = parseInt(layerInputsDiv[i].value);
+                                        if (!isNaN(neuronios)) {
+                                            layerSizes.push(neuronios);
+                                        }
+                                    }
+
+                                    // Adiciona ao array no formato de tupla
+                                    if (layerSizes.length > 0) {
+                                        hiddenLayerSizes.push(`(${layerSizes.join(', ')})`);
+                                    }
+                                }
+                                // Monta a string no formato Grid Search
+                                hiddenLayerConfig = `Hidden Layer Sizes: ${hiddenLayerSizes.join(', ')}`;
+                            }
+
+                            // Número de Épocas
+                            const epoch1Input = parseInt(document.getElementById('epoch1').value);
+                            const epoch2Input = parseInt(document.getElementById('epoch2').value);
+
+                            let epochConfig = '';
+                            if (epoch1Input && epoch2Input) {
+                                epochConfig = `minEpochs: ${epoch1Input}, maxEpochs: ${epoch2Input}`;
+                            }
+
+                            // Numero de Trials
+                            const nTrialsInput = parseInt(document.getElementById('nTrials').value);
+
+                            let nTrialsConfig = '';
+                            if (nTrialsInput) {
+                                nTrialsConfig = `NumTrials: ${nTrialsInput}`;
+                            }
+
+                            // Variável alvo e excluídas
+                            const targetSelecionadas = [];
+                            const deletedSelecionadas = [];
+
+                            const variaveisTargetElements = document.querySelectorAll('#checkbox-list-target input:checked');
+                            variaveisTargetElements.forEach(element => targetSelecionadas.push(element.value));
+
+                            const variaveisDeletedElements = document.querySelectorAll('#checkbox-list-deleted input:checked');
+                            variaveisDeletedElements.forEach(element => deletedSelecionadas.push(element.value));
+
+                            const conteudoFinal = `${foldConfig}\n${scalerConfig}\n${kConfig}\n${scoreFunctionConfig}\n${activationFunctionConfig}\n${solverConfig}\n${learningRateConfig}\n${lrConfig}\n${alfaConfig}\n${hiddenLayerConfig}\n${epochConfig}\n${nTrialsConfig}\nVar Target: ${targetSelecionadas.join(', ')}\nVar Deleted: ${deletedSelecionadas.join(', ')}`;
+
+                            fetch('/trainGridModel', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({conteudoFinal}),
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    console.log("Best Params:", data.best_params);
+                                    console.log("Best Value:", data.best_value);
+                                })
+                                .catch(error => {
+                                    console.error('Erro ao executar o script:', error);
+                                });
+                        });
+                    </script>
+                </div>
+            </div>
+            <div class="navigation buttons">
+                <button type="button" id="prevBtn" onclick="prevStep()" disabled>Previous</button>
+                <span class="dots">
+                    <span class="dot" onclick="goToStep(1)"></span>
+                    <span class="dot" onclick="goToStep(2)"></span>
+                    <span class="dot" onclick="goToStep(3)"></span>
+                    <span class="dot" onclick="goToStep(4)"></span>
+                    <span class="dot" onclick="goToStep(5)"></span>
+                    <span class="dot" onclick="goToStep(6)"></span>
+                    <span class="dot" onclick="goToStep(7)"></span>
+                </span>
+                <button type="button" id="nextBtn" onclick="nextStep()">Next</button>
+            </div>
+        </form>
     </div>
+    <div class="footer">
+        Escola de Artes, Ciências e Humanidades - Universidade de São Paulo
+    </div>
+    <script>
+        let currentStep = 0;
+        const steps = document.querySelectorAll(".step");
+        const prevBtn = document.getElementById("prevBtn");
+        const nextBtn = document.getElementById("nextBtn");
+        const dots = document.querySelectorAll(".dot");
+
+        function showStep(stepIndex) {
+            steps.forEach((step, index) => {
+                step.classList.toggle("active", index === stepIndex);
+            });
+
+            prevBtn.disabled = (stepIndex === 0);
+            nextBtn.disabled = (stepIndex === steps.length - 1);
+            // submitBtn.style.display = (stepIndex === steps.length - 1) ? "inline" : "none";
+
+            // Atualiza os dots de navegação
+            dots.forEach((dot, index) => {
+                dot.classList.toggle("active-dot", index === stepIndex);
+            });
+        }
+
+        function nextStep() {
+            if (validateStep(currentStep)) {
+                currentStep++;
+                showStep(currentStep);
+            }
+        }
+
+        function prevStep() {
+            currentStep--;
+            showStep(currentStep);
+        }
+
+        function goToStep(step) {
+            const stepIndex = step - 1;
+            if (stepIndex >= 0 && stepIndex < steps.length && validateStep(currentStep) && currentStep != 0) {
+                currentStep = stepIndex;
+                showStep(currentStep);
+            }
+        }
+
+        function validateStep(stepIndex) {
+            const inputs = steps[stepIndex].querySelectorAll("input[required]");
+            const step = stepIndex + 1
+            if (step == 2) {
+                const errorMessageStep2 = document.getElementById('error-message-step2');
+                const datasetName = document.getElementById('datasetFileName');
+                if (datasetName == "No dataset selected") {
+                    errorMessageStep2.innerText = "Select your dataset.";
+                    return false
+                } else if (document.querySelectorAll('#checkbox-list-target input[type="checkbox"]:checked').length === 0) {
+                    errorMessageStep2.innerText = "Select your model's target feature";
+                    return false
+                } else {
+                    errorMessageStep2.innerText = "";
+                    return true
+                }
+            } else if (step == 3) {
+                const errorMessageK = document.getElementById('error-message-k');
+                const errorMessageSF = document.getElementById('error-message-SF');
+                const errorMessageFS = document.getElementById('error-message-FS');
+                if (errorMessageK.innerText != "" || errorMessageFS.innerText != "" || errorMessageSF.innerText != "") {
+                    return false
+                } else {
+                    return true
+                }
+            } else if (step == 4) {
+                const errorMessageAF = document.getElementById('error-message-AF');
+                const errorMessageAlpha = document.getElementById('error-message-alpha');
+                const errorMessageEpoch = document.getElementById('error-message-epoch');
+                if (errorMessageAF.innerText != "" || errorMessageAlpha.innerText != "" || errorMessageEpoch.innerText != "") {
+                    return false
+                } else {
+                    return true
+                }
+            } else if (step == 5) {
+                const errorMessageSolver = document.getElementById('error-message-solver');
+                const errorMessageLR = document.getElementById('error-message-lr');
+                const errorMessageILR = document.getElementById('error-message-ilr');
+                if (errorMessageSolver.innerText != "" || errorMessageLR.innerText != "" || errorMessageILR.innerText != "") {
+                    return false
+                } else {
+                    return true
+                }
+            } else if (step == 6) {
+                const errorMessageHL = document.getElementById('error-message-hl');
+                if (errorMessageHL.innerText != "") {
+                    return false
+                } else {
+                    return true
+                }
+            }
+            for (let input of inputs) {
+                if (!input.checkValidity()) {
+
+
+                    return false;
+                }
+            }
+            return true;
+        }
+        showStep(currentStep);
+    </script>
+    <script>
+        document.querySelectorAll('.option-tooltip').forEach(container => {
+            const icon = container.querySelector('.tooltip-icon');
+            const tooltip = container.querySelector('.tooltip-text');
+
+            icon.addEventListener('mouseenter', () => {
+                const rect = icon.getBoundingClientRect();
+                tooltip.classList.add('fixed-tooltip');
+                tooltip.style.top = `${rect.top + window.scrollY + rect.height - 8}px`;
+                tooltip.style.left = `${rect.right + rect.width - 15}px`;
+                tooltip.style.visibility = 'visible';
+                tooltip.style.opacity = '1';
+            });
+
+            icon.addEventListener('mouseleave', () => {
+                tooltip.classList.remove('fixed-tooltip');
+                tooltip.style.visibility = '';
+                tooltip.style.opacity = '';
+                tooltip.style.top = '';
+                tooltip.style.left = '';
+            });
+        });
+    </script>
 </body>
 
 </html>
