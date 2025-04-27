@@ -1,0 +1,13 @@
+<a href="/modelDev">Model Development</a>
+<a href="/modelApp">Model Application</a>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const currentPath = window.location.pathname;
+        document.querySelectorAll("#menu a").forEach(link => {
+            if (link.getAttribute("href") === currentPath) {
+                link.classList.add("active-tab");
+            }
+        });
+    });
+</script>
